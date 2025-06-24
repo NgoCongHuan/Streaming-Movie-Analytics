@@ -18,43 +18,45 @@ def crawl_studio(queue):
     Returns:
         None
     """
-    try:
-        # Get a batch of movie slugs and IDs from the queue
-        list_slug_id = queue.get(timeout=10)
-    except Exception:
-        print('[studio] Queue is empty')
-        return
-
     list_studio = []  # Final list to store all studio info
 
-    for slug_id in list_slug_id:
-        slug = slug_id['slug']
-        _id = slug_id['_id']
+    while True:
+        list_slug_id = queue.get()
+        if list_slug_id is None:
+            queue.task_done()
+            break
 
-        studio = {"_id": _id}
+        for slug_id in list_slug_id:
+            slug = slug_id['slug']
+            _id = slug_id['_id']
 
-        try:
-            # Send GET request to the movie page
-            response = requests.get(f'https://www.rophim.me/phim/{slug}.{_id}')
-            soup = BeautifulSoup(response.content, 'html.parser')
+            studio = {"_id": _id}
 
-            # Parse all "detail-line" sections for entity info
-            for div in soup.find_all('div', class_='detail-line'):
-                label = div.text.strip()
+            try:
+                # Send GET request to the movie page
+                response = requests.get(f'https://www.rophim.me/phim/{slug}.{_id}')
+                soup = BeautifulSoup(response.content, 'html.parser')
 
-                if label.startswith('Networks'):
-                    studio['networks'] = extract_entities(div)
+                # Parse all "detail-line" sections for entity info
+                for div in soup.find_all('div', class_='detail-line'):
+                    label = div.text.strip()
 
-                elif label.startswith('Sản xuất'):
-                    studio['production_companies'] = extract_entities(div)
+                    if label.startswith('Networks'):
+                        studio['networks'] = extract_entities(div)
 
-                elif label.startswith('Đạo diễn'):
-                    studio['directors'] = extract_entities(div)
+                    elif label.startswith('Sản xuất'):
+                        studio['production_companies'] = extract_entities(div)
 
-        except requests.exceptions.RequestException as e:
-            print(f'[studio] Error fetching data for slug={slug}: {e}')
+                    elif label.startswith('Đạo diễn'):
+                        studio['directors'] = extract_entities(div)
+                
+                list_studio.append(studio)
+                print(f'[studio] Successfully crawled cast for movie ID: {_id}')
 
-        list_studio.append(studio)
+            except requests.exceptions.RequestException as e:
+                print(f'[studio] Error fetching data for slug={slug}: {e}')
+
+        queue.task_done()
 
     # Save result to JSON
     save_to_json(list_studio, 'studio')

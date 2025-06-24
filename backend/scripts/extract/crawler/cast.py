@@ -15,30 +15,32 @@ def crawl_cast(queue):
     Returns:
         None
     """
-    try:
-        # Get a batch of movie IDs from the queue
-        list_slug_id = queue.get(timeout=10)
-    except Exception:
-        print('[cast] Queue is empty')
-        return
-
     list_cast = []  # Store cast data for all movies
 
-    for slug_id in list_slug_id:
-        _id = slug_id['_id']
+    while True:
+        
+        list_slug_id = queue.get()
+        if list_slug_id is None:
+            queue.task_done()
+            break
+        
+        for slug_id in list_slug_id:
+            _id = slug_id['_id']
 
-        try:
-            # Send GET request to fetch cast information for the movie
-            response = requests.get(f'https://api.rophim.me/v1/movie/casts/{_id}', timeout=10)
-            response.raise_for_status()
-            cast = response.json()['result']
+            try:
+                # Send GET request to fetch cast information for the movie
+                response = requests.get(f'https://api.rophim.me/v1/movie/casts/{_id}', timeout=10)
+                response.raise_for_status()
+                cast = response.json()['result']
 
-            list_cast.append(cast)
+                list_cast += cast
 
-            print(f'[cast] Successfully crawled cast for movie ID: {_id}')
+                print(f'[cast] Successfully crawled cast for movie ID: {_id}')
 
-        except requests.exceptions.RequestException as e:
-            print(f'[cast] Error fetching cast for movie ID {_id}: {e}')
+            except requests.exceptions.RequestException as e:
+                print(f'[cast] Error fetching cast for movie ID {_id}: {e}')
+        
+        queue.task_done()
 
     # Save the collected cast data to a JSON file
     save_to_json(list_cast, 'cast')

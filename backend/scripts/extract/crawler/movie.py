@@ -25,7 +25,7 @@ def get_page_count(type: int):
         return
 
 
-def crawl_movie(queue):
+def crawl_movie(cast_queue, studio_queue):
     """
     Crawls movie data from the Rophim API based on movie type and page number.
 
@@ -45,7 +45,7 @@ def crawl_movie(queue):
     for type in types:
         page_count = get_page_count(type)
 
-        for page in range(1, page_count + 1):
+        for page in range(1, page_count+1):
             api_url = (
                 f"https://api.rophim.me/v1/movie/filterV2?type={type}"
                 f"&exclude_status=Upcoming&sort=release_date&page={page}"
@@ -56,11 +56,15 @@ def crawl_movie(queue):
                 response.raise_for_status()
                 movies = response.json()['result']['items']
 
-                list_movie.append(movies)
+                list_movie += movies
 
-                queue.put([
-                    {'slug': m['slug'], '_id': m['_id']} for m in movies
+                list_slug_id = ([
+                    {'slug': m['slug'], '_id': m['_id']} 
+                    for m in movies
                 ])
+
+                cast_queue.put(list_slug_id)
+                studio_queue.put(list_slug_id)
 
                 print(f'[movie] Successfully crawled page {page}/{page_count} for type {type}')
 
@@ -69,3 +73,7 @@ def crawl_movie(queue):
                 return
 
     save_to_json(list_movie, 'movie')
+
+    # Push poison pills
+    cast_queue.put(None)
+    studio_queue.put(None)
