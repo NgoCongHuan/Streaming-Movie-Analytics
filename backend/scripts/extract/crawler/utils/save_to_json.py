@@ -2,21 +2,19 @@ import os
 import json
 from datetime import datetime
 
-def save_to_json(dictionary, file_name):
+def save_to_json(json, folder_name):
+
     date = datetime.now()
 
     parent_dir = os.getcwd()
-    # Tạo đường dẫn đến thư mục (chỉ tới cấp chứa file)
-    folder_path = os.path.join(parent_dir, f'backend/data/raw/{file_name}/{date.year}/{date.month}/{date.day}')
     
-    # Tạo thư mục nếu chưa tồn tại
+    folder_path = os.path.join(parent_dir, f'backend/data/raw/{folder_name}/{date.year}/{date.month}/{date.day}')
+    
     os.makedirs(folder_path, exist_ok=True)
 
-    # Tạo tên file
-    file_path = os.path.join(folder_path, f'{file_name}_{date.day}_{date.month}_{date.year}.json')
+    file_path = os.path.join(folder_path, f'{folder_name}_{date.strftime('%Y_%m_%d')}.json')
 
-    # Chuyển dict sang JSON và ghi vào file
-    json_object = json.dumps(dictionary, indent=4, ensure_ascii=False)
+    json_object = json.dumps(json, indent=4, ensure_ascii=False)
 
     with open(file_path, 'w', encoding='utf-8') as outfile:
         outfile.write(json_object)
