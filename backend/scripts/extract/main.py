@@ -11,7 +11,6 @@ if __name__ == '__main__':
     studio_queue = queue.Queue()
 
     movie_thread = threading.Thread(target=crawl_movie, args=(cast_queue, studio_queue))
-    
     cast_thread = threading.Thread(target=crawl_cast, args=(cast_queue,))
     studio_thread = threading.Thread(target=crawl_studio, args=(studio_queue,))
 

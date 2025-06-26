@@ -1,46 +1,65 @@
-import requests
+import aiohttp
+import asyncio
 from .utils.save_to_json import save_to_json
+
 
 def crawl_cast(queue):
     """
-    Crawls cast information for a batch of movies from the Rophim API.
+    Entry point function to run the asynchronous cast crawler inside a thread.
+    """
+    asyncio.run(crawl_cast_async(queue))
 
-    Retrieves a list of movie IDs from a queue, then fetches the cast data
-    for each movie by sending a request to the API. The results are saved to a JSON file.
+
+async def crawl_cast_async(queue):
+    """
+    Asynchronously consumes a queue of movie IDs and fetches cast information
+    from the Rophim API for each movie.
 
     Args:
-        queue (Queue): A thread-safe queue that contains a list of dictionaries 
-                       with '_id' (movie ID) and 'slug' (not used here, but available).
-
-    Returns:
-        None
+        queue (Queue): A thread-safe queue containing a list of movie dictionaries
+                       with '_id' and 'slug' keys.
     """
-    list_cast = []  # Store cast data for all movies
+    list_cast = []  # Store all cast information
 
     while True:
-        
         list_slug_id = queue.get()
+
         if list_slug_id is None:
             queue.task_done()
-            break
-        
-        for slug_id in list_slug_id:
-            _id = slug_id['_id']
+            break  # Exit when poison pill (None) is received
 
-            try:
-                # Send GET request to fetch cast information for the movie
-                response = requests.get(f'https://api.rophim.me/v1/movie/casts/{_id}', timeout=10)
-                response.raise_for_status()
-                cast = response.json()['result']
+        # Build URLs for cast data
+        api_urls = [
+            f"https://api.rophim.me/v1/movie/casts/{slug_id['_id']}" 
+            for slug_id in list_slug_id
+        ]
 
-                list_cast += cast
+        async with aiohttp.ClientSession() as session:
+            tasks = [fetch_data(session, url) for url in api_urls]
+            results = await asyncio.gather(*tasks)
 
-                print(f'[cast] Successfully crawled cast for movie ID: {_id}')
+        # Flatten the results (list of lists) into one list
+        list_cast += [item for sublist in results for item in sublist]
 
-            except requests.exceptions.RequestException as e:
-                print(f'[cast] Error fetching cast for movie ID {_id}: {e}')
-        
         queue.task_done()
 
-    # Save the collected cast data to a JSON file
+    # Save collected data
     save_to_json(list_cast, 'cast')
+    print('[cast] Successfully crawled all cast')
+
+
+async def fetch_data(session, url):
+    """
+    Sends an asynchronous GET request and extracts the 'result' field from the JSON response.
+
+    Args:
+        session (aiohttp.ClientSession): The active HTTP session.
+        url (str): The API endpoint to fetch cast data.
+
+    Returns:
+        list: A list of cast members for one movie.
+    """
+    async with session.get(url) as response:
+        await asyncio.sleep(1)  # Wait a bit to avoid spamming the API
+        data = await response.json()
+        return data.get('result', [])

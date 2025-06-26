@@ -4,40 +4,35 @@ from unidecode import unidecode
 from bs4 import BeautifulSoup
 from .utils.save_to_json import save_to_json
 
+
 def crawl_studio(queue):
     """
     Crawls studio-related information (networks, production companies, directors) 
-    for a batch of movies given in the queue.
-
-    For each movie, it sends a request to the Rophim website, parses the HTML content, 
-    and extracts relevant entities using BeautifulSoup.
+    for a batch of movies by scraping the Rophim movie page.
 
     Args:
-        queue (Queue): A thread-safe queue containing a list of dictionaries with 'slug' and '_id' for each movie.
-
-    Returns:
-        None
+        queue (Queue): A thread-safe queue containing dictionaries with 'slug' and '_id' of movies.
     """
-    list_studio = []  # Final list to store all studio info
+    list_studio = []
 
     while True:
         list_slug_id = queue.get()
+
         if list_slug_id is None:
             queue.task_done()
-            break
+            break  # Stop when poison pill is received
 
         for slug_id in list_slug_id:
             slug = slug_id['slug']
             _id = slug_id['_id']
-
             studio = {"_id": _id}
 
             try:
-                # Send GET request to the movie page
+                # Send HTTP GET request to the movie page
                 response = requests.get(f'https://www.rophim.me/phim/{slug}.{_id}')
                 soup = BeautifulSoup(response.content, 'html.parser')
 
-                # Parse all "detail-line" sections for entity info
+                # Find all detail lines and extract relevant entities
                 for div in soup.find_all('div', class_='detail-line'):
                     label = div.text.strip()
 
@@ -49,47 +44,28 @@ def crawl_studio(queue):
 
                     elif label.startswith('Đạo diễn'):
                         studio['directors'] = extract_entities(div)
-                
+
                 list_studio.append(studio)
-                print(f'[studio] Successfully crawled cast for movie ID: {_id}')
+                print(f'[studio] Successfully crawled studio for movie ID: {_id}')
 
             except requests.exceptions.RequestException as e:
                 print(f'[studio] Error fetching data for slug={slug}: {e}')
 
         queue.task_done()
 
-    # Save result to JSON
     save_to_json(list_studio, 'studio')
-
-
-def convert_to_slug(text):
-    """
-    Converts a string to a URL-friendly slug using unidecode and regex.
-
-    Args:
-        text (str): The input text to convert.
-
-    Returns:
-        str: A slugified version of the text.
-    """
-    try:
-        text = unidecode(text).lower()
-        text = re.sub(r'[^a-z0-9]+', '-', text).strip('-')
-        return text
-    except Exception:
-        print('[studio] Failed to convert to slug')
-        return
+    print('[studio] Successfully crawled all studios')
 
 
 def extract_entities(div):
     """
-    Extracts entity information (e.g., directors, producers) from a BeautifulSoup <div> element.
+    Extracts entities (e.g., directors, producers) from a BeautifulSoup <div> element.
 
     Args:
-        div (bs4.element.Tag): The <div> element containing entity links.
+        div (bs4.element.Tag): The <div> containing span and anchor tags.
 
     Returns:
-        List[dict]: A list of dictionaries, each with keys: '_id', 'name', and 'slug'.
+        List[dict]: List of dictionaries with '_id', 'name', and 'slug' for each entity.
     """
     try:
         entities = [
@@ -103,4 +79,23 @@ def extract_entities(div):
         return entities
     except Exception:
         print('[studio] Failed to extract entities')
-        return
+        return []
+
+
+def convert_to_slug(text):
+    """
+    Converts a text string into a URL-friendly slug using unidecode and regex.
+
+    Args:
+        text (str): The original string.
+
+    Returns:
+        str: Slugified version of the string.
+    """
+    try:
+        text = unidecode(text).lower()
+        text = re.sub(r'[^a-z0-9]+', '-', text).strip('-')
+        return text
+    except Exception:
+        print('[studio] Failed to convert to slug')
+        return ""
