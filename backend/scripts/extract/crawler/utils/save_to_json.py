@@ -3,21 +3,16 @@ import json
 from datetime import datetime
 
 def save_to_json(data, folder_name):
-    """
-    Save a list of JSON objects to a file in NDJSON format (newline-delimited JSON).
-
-    Args:
-        data (list): A list of dictionaries, where each dictionary represents a JSON object.
-        folder_name (str): The name of the subfolder to store the data 
-                           (e.g., 'movie', 'cast', 'studio').
-    """
     date = datetime.now()
 
-    parent_dir = os.getcwd()
+    current_dir = os.path.dirname(os.path.abspath(__file__))  # .../crawler/utils
+    project_root = os.path.abspath(os.path.join(current_dir, "../../../../"))
+
     folder_path = os.path.join(
-        parent_dir,
-        f'backend/data/raw/{folder_name}/{date.year}/{date.month}/{date.day}'
+        project_root,
+        f'data/raw/{folder_name}/{date.year}/{date.month}/{date.day}'
     )
+
     os.makedirs(folder_path, exist_ok=True)
 
     file_path = os.path.join(
@@ -25,8 +20,16 @@ def save_to_json(data, folder_name):
         f'{folder_name}_{date.strftime("%Y_%m_%d")}.json'
     )
 
-    # Write each dictionary as a JSON object on a separate line (NDJSON format)
-    with open(file_path, 'w', encoding='utf-8') as outfile:
-        for item in data:
-            json_line = json.dumps(item, ensure_ascii=False)
-            outfile.write(json_line + '\n')
+    # Debug
+    print("🟩 Saving to:", file_path)
+    print("🟨 Number of items:", len(data))
+    print("📂 Folder exists:", os.path.exists(folder_path))
+
+    try:
+        with open(file_path, 'w', encoding='utf-8') as outfile:
+            for item in data:
+                json_line = json.dumps(item, ensure_ascii=False)
+                outfile.write(json_line + '\n')
+        print(f"✅ Saved file to {file_path}")
+    except Exception as e:
+        print(f"❌ Error saving file: {e}")

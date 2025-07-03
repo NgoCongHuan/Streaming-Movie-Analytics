@@ -23,8 +23,10 @@ def crawl_studio(queue):
             break  # Stop when poison pill is received
 
         for slug_id in list_slug_id:
+            
             slug = slug_id['slug']
             _id = slug_id['_id']
+
             studio = {"_id": _id}
 
             try:
@@ -36,7 +38,10 @@ def crawl_studio(queue):
                 for div in soup.find_all('div', class_='detail-line'):
                     label = div.text.strip()
 
-                    if label.startswith('Networks'):
+                    if label.startswith('Quốc gia'):
+                        studio['origin_country'] = extract_entities(div)
+                    
+                    elif label.startswith('Networks'):
                         studio['networks'] = extract_entities(div)
 
                     elif label.startswith('Sản xuất'):
